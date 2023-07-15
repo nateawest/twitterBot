@@ -396,8 +396,8 @@ def discord_bot():
     channel_live = os.getenv('CHANNELLIVE')       # one channel to update me on status of bot
     bot = commands.Bot(command_prefix='!', intents=intents)
     # first post time will be at 9 am, but it'll change each day at midnight
-    first_post_time = 22
-    second_post_time = 23
+    first_post_time = 9
+    second_post_time = 13
     have_posted = 0
     bool_2 = False
     reply_counter = 0
