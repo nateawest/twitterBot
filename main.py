@@ -7,6 +7,7 @@ from discord.ext import commands, tasks
 from datetime import datetime
 from selenium.common import NoSuchElementException
 from selenium.webdriver.common.by import By
+from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
@@ -24,8 +25,15 @@ twit_name = os.getenv('TWIT_NAME')
 twit_pass = os.getenv('TWIT_PASS')
 twit_user = os.getenv('TWIT_USER')
 
+# Set up Firefox options for headless browsing
+firefox_options = Options()
+firefox_options.add_argument("--headless")  # Comment this line if you want to see the browser GUI
 
-def open_twitter(driver):
+
+def open_twitter():
+    print("Attempting to open twitter via headerless browser")
+    driver = webdriver.Firefox(service=s, options=firefox_options)
+    # driver = webdriver.Firefox(service=s)
     # extra step variable for bot check
     botCheck = 'There was unusual login activity on your account. To help keep your account safe, please enter your phone number or username to verify it’s you.'
     # open twitter
@@ -41,7 +49,7 @@ def open_twitter(driver):
     login_button = driver.find_element(By.XPATH,
                                        '/html/body/div/div/div/div[1]/div/div/div/div/div/div/div[2]/div[2]/div/div/div[2]/div[2]/div/div/div/div[6]/div')
     login_button.click()
-
+    print("Successfully entered username")
     time.sleep(5)  # Wait for the page to load
 
 
@@ -79,8 +87,12 @@ def open_twitter(driver):
     password_button2 = driver.find_element(By.XPATH,
                                            '/html/body/div/div/div/div[1]/div/div/div/div/div/div/div[2]/div[2]/div/div/div[2]/div[2]/div[2]/div/div[1]/div/div/div/div')
     password_button2.click()
-
-    return
+    print("successfuly entered password. open_twitter() is complete")
+    # chaning zoom level will allow us to inspect more elements
+    zoom_level = 0.5  # 50% zoom level
+    # Execute JavaScript to zoom out the browser
+    driver.execute_script(f"document.body.style.zoom = '{zoom_level}'")
+    return driver
 
 
 def search_twitter(driver, search_query):
@@ -153,7 +165,10 @@ def store_tweet(target_string):
         print("Error: Unable to write to the file.")
 
 
-def like_home_page(driver):
+def like_home_page():
+    driver = open_twitter()
+    time.sleep(3)
+
     tweet_elements = driver.find_elements(By.XPATH, "//article[contains(@data-testid, 'tweet')]")
     captured_elements = []  # store the element to get a user reply count on tweet
 
@@ -161,6 +176,7 @@ def like_home_page(driver):
     tweet_elements = driver.find_elements(By.XPATH, "//article[contains(@data-testid, 'tweet')]")
     # Scroll and capture more tweets
     for _ in range(3):
+        print("Scrolling through tweets")
         # Scroll to the bottom of the page
         driver.find_element(By.TAG_NAME, "body").send_keys(Keys.END)
         time.sleep(2)  # Wait for the page to load after scrolling
@@ -175,9 +191,13 @@ def like_home_page(driver):
         like_element.click()
         like_counter += random.randint(0, 2)
         time.sleep(2)
+    driver.close()
 
 
-def reply_to_tweets(driver, search_query):
+def reply_to_tweets(search_query):
+    # open twitter using a headerless browser
+    driver = open_twitter()
+    time.sleep(3)
     # use search bar
     search_twitter(driver, search_query)
     # page needs a chance to load between methods
@@ -192,6 +212,7 @@ def reply_to_tweets(driver, search_query):
     captured_elements = []  # store the element to get a user reply count on tweet
 
     # trying to capture tweet, link, and element and append to array. If no element present pass
+    print("Capturing tweets for inspection")
     for tweet_element in tweet_elements:
         try:
             tweet_text_element = tweet_element.find_element(By.XPATH, ".//div[@lang='en']")
@@ -220,7 +241,7 @@ def reply_to_tweets(driver, search_query):
                 captured_elements.append(tweet_element)
         except NoSuchElementException:
             pass
-
+    print("Tweets captured now processing")
     # if the first tweet was market as pinned we will just start iterating through array at index 1
     i_counter = 0
     if pin_check == 1:
@@ -252,7 +273,7 @@ def reply_to_tweets(driver, search_query):
 
     # set initial all_tweets to start loop
     all_replies = driver.find_elements(By.XPATH, '//div[@data-testid]//article[@data-testid="tweet"]')
-
+    print("Examining replies")
     while not result:
 
         for item in all_replies[0:]:  # skip tweet already scrapped
@@ -281,6 +302,7 @@ def reply_to_tweets(driver, search_query):
         combined_replies = '\n'.join(flattened_list)
         reply_to_tweet = captured_tweets[i_counter]
 
+        print("Reaching out to open_ai")
         # call open ai function to get chatGPT to help us generate a response off of tweet and replies
         open_ai_response = send_openai(search_query, reply_to_tweet, combined_replies, comment_count_int)
         print("ChatGPT:   ", open_ai_response)
@@ -289,19 +311,21 @@ def reply_to_tweets(driver, search_query):
         scroll_to_top(driver)
         time.sleep(1)
         # enter our reply and submit
+        driver.execute_script("window.scrollTo(0, 0);")
         # took a while to find the correct css selector
         reply_field = driver.find_element(By.CSS_SELECTOR, 'div[data-testid="tweetTextarea_0"]')
         reply_field.click()
         reply_field.send_keys(open_ai_response)
         reply_field.send_keys(Keys.RETURN)
+        time.sleep(5)
+        reply_button = driver.find_element(By.CSS_SELECTOR, 'div.r-42olwf:nth-child(2)')
+        reply_button.click()
         time.sleep(2)
-        reply_button = driver.find_element(By.CSS_SELECTOR, 'div.r-42olwf:nth-child(2) > div:nth-child(1) > span:nth-child(1) > span:nth-child(1)')
-        # reply_button.click()
         # store tweet function so that we don't reply to same tweet more than once
         store_tweet(captured_tweets[i_counter])
         # putting together a discord update string
         return_str = "Tweet: " + reply_to_tweet + "\n\nMy response: " + open_ai_response
-        driver.get('https://twitter.com/home')
+        driver.close()
         return return_str
 
 
@@ -372,8 +396,8 @@ def discord_bot():
     channel_live = os.getenv('CHANNELLIVE')       # one channel to update me on status of bot
     bot = commands.Bot(command_prefix='!', intents=intents)
     # first post time will be at 9 am, but it'll change each day at midnight
-    first_post_time = 20
-    second_post_time = 22
+    first_post_time = 22
+    second_post_time = 23
     have_posted = 0
     bool_2 = False
     reply_counter = 0
@@ -390,35 +414,27 @@ def discord_bot():
         # we will use the hour to decide when to tweet
         current_time = datetime.now().time().strftime("%H")
         # tweet targets and counter
-        tweet_target = ['@verge', '@blckriflecoffee', '@NintendoAmerica', '@dallasmavs', '@MarketWatch', '@REI', '@SpaceX', '@elonmusk']
+        tweet_target = ['@MarketWatch', '@REI', '@SpaceX', '@elonmusk', '@verge', '@blckriflecoffee', '@NintendoAmerica', '@dallasmavs']
 
         # we will reset post time at midnight every night
-        if int(current_time) == 22 and not post_bool:
+        if int(current_time) == 0 and not post_bool:
             post_time = random.randint(9, 16)
             post_time2 = post_time + random.randint(1, 5)
             have_i_posted = 0
         # like some tweets to look more human
         if int(current_time) == post_time - 1:
-            fox_driver = webdriver.Firefox(service=s)
             try:
-                open_twitter(fox_driver)
-                time.sleep(2)
-                like_home_page(fox_driver)
-                fox_driver.close()
+                like_home_page()
             except:
                 pass
-            fox_driver.close()
 
         # first post time of the day
         if int(current_time) == post_time and have_i_posted < 2:
             if target_counter_v == 7:
                 target_counter_v = 0
-            fox_driver = webdriver.Firefox(service=s)
-            open_twitter(fox_driver)
-            time.sleep(2)
         # if the post fails still increment have i posted so we don't end up posting twice at same time for post time 2
             try:
-                my_tweet = reply_to_tweets(fox_driver, tweet_target[target_counter_v])
+                my_tweet = reply_to_tweets(tweet_target[target_counter_v])
                 await channel.send(my_tweet)
             except:
                 have_i_posted += 1
@@ -426,35 +442,26 @@ def discord_bot():
             have_i_posted += 1
             post_bool = False
             target_counter_v += 1
-            fox_driver.close()
 
         # post time 2
         if int(current_time) == post_time2 and have_i_posted < 2:
             if target_counter_v == 7:
                 target_counter_v = 0
-            fox_driver = webdriver.Firefox(service=s)
-            open_twitter(fox_driver)
-            time.sleep(2)
             try:
-                my_tweet = reply_to_tweets(fox_driver, tweet_target[target_counter_v])
+                my_tweet = reply_to_tweets(tweet_target[target_counter_v])
                 await channel.send(my_tweet)
             except:
                 have_i_posted += 1
                 pass
             have_i_posted += 1
             target_counter_v += 1
-            fox_driver.close()
 
         # like tweets x2
         if int(current_time) == post_time + 1:
-            fox_driver = webdriver.Firefox(service=s)
             try:
-                open_twitter(fox_driver)
-                time.sleep(2)
-                like_home_page(fox_driver)
+                like_home_page()
             except:
                 pass
-            fox_driver.close()
 
     @bot.event
     async def on_ready():
@@ -471,4 +478,5 @@ def discord_bot():
 s = Service(GeckoDriverManager().install())
 # The discord bot function acts as my bot scheduler and updates me
 discord_bot()
+
 
