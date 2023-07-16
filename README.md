@@ -30,3 +30,19 @@ Configuration
 
 Before running the Twitter bot, you need to provide your Twitter account credentials, openAi token, and discord token and channel id's if you plan on using discord
 I used discord to schedule my replies. add some variability, and send me updates on bots performance
+
+Contributing
+
+If you would like to contribute to this project, you can follow these steps:
+
+    Fork the repository on GitHub.
+
+    Create a new branch with a descriptive name for your feature or bug fix:
+
+    git checkout -b my-new-feature
+
+Make the necessary changes and commit your code.
+
+Push your changes to your forked repository.
+
+Submit a pull request, explaining the changes you have made and why they should be merged.
