@@ -8,8 +8,6 @@ from datetime import datetime
 from selenium.common import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium import webdriver
 from selenium.webdriver.firefox.service import Service
@@ -31,8 +29,9 @@ firefox_options.add_argument("--headless")  # Comment this line if you want to s
 
 
 def open_twitter():
-    print("Attempting to open twitter via headerless browser")
+    print("Attempting to open twitter via headless browser")
     driver = webdriver.Firefox(service=s, options=firefox_options)
+    # comment out the driver above and uncomment the driver below to use a browser with GUI
     # driver = webdriver.Firefox(service=s)
     # extra step variable for bot check
     botCheck = 'There was unusual login activity on your account. To help keep your account safe, please enter your phone number or username to verify it’s you.'
@@ -74,12 +73,14 @@ def open_twitter():
     except Exception as e:
         print("An error occurred:", str(e))
         print("no check")
-        password_field = driver.find_element(By.XPATH,
-                                             '/html/body/div/div/div/div[1]/div/div/div/div/div/div/div[2]/div[2]/div/div/div[2]/div[2]/div[1]/div/div[2]/label/div/div[2]/div/input')
+        password_field = driver.find_element(By.CSS_SELECTOR, '.r-homxoj')
         password_field.send_keys(twit_pass)
         password_button = driver.find_element(By.XPATH,
                                               '/html/body/div/div/div/div[1]/div/div/div/div/div/div/div[2]/div[2]/div/div/div[2]/div[2]/div[2]/div/div[1]/div/div/div/div/span/span')
         password_button.click()
+        print("successfuly entered password. open_twitter() is complete")
+        return driver
+
     # 3rd step input password. Different xpath unusual activity vs not
     password_field2 = driver.find_element(By.XPATH,
                                           '/html/body/div/div/div/div[1]/div/div/div/div/div/div/div[2]/div[2]/div/div/div[2]/div[2]/div[1]/div/div/div[3]/div/label/div/div[2]/div[1]/input')
@@ -182,20 +183,25 @@ def like_home_page():
         time.sleep(2)  # Wait for the page to load after scrolling
         # Find and capture newly loaded tweets
         tweet_elements = driver.find_elements(By.XPATH, "//article[contains(@data-testid, 'tweet')]")
-
-    # lets like a few post in our feed to make us look more human
-    like_counter = 0
-    for i in range(3):
-        driver.execute_script("arguments[0].scrollIntoView();", tweet_elements[like_counter])
-        like_element = tweet_elements[like_counter].find_element(By.XPATH, "/html/body/div[1]/div/div/div[2]/main/div/div/div/div[1]/div/div[5]/div/section/div/div/div/div/div[2]/div/div/article/div/div/div[2]/div[2]/div[4]/div/div[3]/div/div/div[2]/span/span/span")
-        like_element.click()
-        like_counter += random.randint(0, 2)
-        time.sleep(2)
-    driver.close()
+    try:
+        # lets like a few post in our feed to make us look more human
+        like_counter = 0
+        for i in range(3):
+            print("Liking tweets")
+            driver.execute_script("arguments[0].scrollIntoView();", tweet_elements[like_counter])
+            like_element = tweet_elements[like_counter].find_element(By.XPATH, "/html/body/div[1]/div/div/div[2]/main/div/div/div/div[1]/div/div[5]/div/section/div/div/div/div/div[2]/div/div/article/div/div/div[2]/div[2]/div[4]/div/div[3]/div/div/div[2]/span/span/span")
+            like_element.click()
+            like_counter += random.randint(0, 2)
+            time.sleep(2)
+        driver.close()
+        print("Done and closing")
+    except:
+        driver.close()
+        return
 
 
 def reply_to_tweets(search_query):
-    # open twitter using a headerless browser
+    # open twitter using a headless browser
     driver = open_twitter()
     time.sleep(3)
     # use search bar
@@ -322,7 +328,9 @@ def reply_to_tweets(search_query):
         reply_button.click()
         time.sleep(2)
         # store tweet function so that we don't reply to same tweet more than once
-        store_tweet(captured_tweets[i_counter])
+        store_tweet(captured_tweets[i_counter] + "\n")
+        # store our response
+        store_tweet("My reply: " + open_ai_response)
         # putting together a discord update string
         return_str = "Tweet: " + reply_to_tweet + "\n\nMy response: " + open_ai_response
         driver.close()
@@ -391,7 +399,6 @@ def discord_bot():
     intents.presences = False
     intents.message_content = True  # Enable the message content intent
 
-    rules_str = os.getenv('RULES')
     channel_id = os.getenv('CHANNELID')           # one channel to post the tweet and my response
     channel_live = os.getenv('CHANNELLIVE')       # one channel to update me on status of bot
     bot = commands.Bot(command_prefix='!', intents=intents)
@@ -474,9 +481,48 @@ def discord_bot():
     bot.run(discord_token)
 
 
+def event_scheduled():
+    # I wanted to store a variable so that I could increment through twitter handles everytime the event runs
+    random_value = random.randint(0, 7)
+    file_path = os.path.join(os.path.dirname(__file__), 'variable.txt')
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            index = file.read().strip()
+            if index:
+                index = int(index)
+                print(index)
+            else:
+                index = random_value
+                print("index not found")
+    except FileNotFoundError:
+        index = random_value
+        print("file not found")
+
+    handle_targets = ['@MarketWatch', '@REI', '@SpaceX', '@elonmusk', '@verge', '@blckriflecoffee', '@NintendoAmerica',
+                    '@dallasmavs']
+    target_handle = handle_targets[index]
+
+    # reset our index value in file, if it reaches the largest index start over at 0
+    if index < 7:
+        index += 1
+    else:
+        index = 0
+
+    with open(file_path, 'w') as file:
+        file.write(str(index))
+
+    # call reply function
+    reply_to_tweets(target_handle)
+    # call like function (emulate user activities)
+    like_home_page()
+
+
 # In order to create our driver lets first create a service object
 s = Service(GeckoDriverManager().install())
-# The discord bot function acts as my bot scheduler and updates me
-discord_bot()
 
+# The discord bot function acts as my bot scheduler and updates me
+# discord_bot()
+
+# If you don't want to use discord you can use a task scheduler
+event_scheduled()
 
