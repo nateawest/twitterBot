@@ -20,7 +20,7 @@ Clone this repository to your local machine using the following command:
 Change into the project directory:
   cd twitter-bot
 
-git clone https://github.com/your-username/twitter-bot.git
+install requirements
   pip install -r requirements.txt
 
 Download the appropriate WebDriver for your browser and ensure it is added to your system's PATH.
@@ -29,7 +29,7 @@ I used firefox because it has a headless browser if you want to use a different 
 Configuration
 
 Before running the Twitter bot, you need to provide your Twitter account credentials, openAi token, and discord token and channel id's if you plan on using discord
-I used discord to schedule my replies. add some variability, and send me updates on bots performance
+I used discord to schedule my replies. add some variability, and send me updates on bots performance. You can also use a task scheduler
 
 Contributing
 
