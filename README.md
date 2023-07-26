@@ -15,7 +15,7 @@ To run the Twitter bot, you need to have the following dependencies installed:
 Installation
 
 Clone this repository to your local machine using the following command:
-  git clone https://github.com/your-username/twitter-bot.git
+  git clone https://github.com/nateawest/twitterBot.git
 
 Change into the project directory:
   cd twitter-bot
